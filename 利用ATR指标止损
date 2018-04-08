@@ -1,0 +1,121 @@
+'''
+止损描述 :  
+    计算ATR指标。 若当前价< 持仓最高价-3* ATR ： 
+                    卖出止损。
+
+套用方法： 
+0:  在 init 中设置你的 moving average ATR 周期： context.ATRperiod=22
+1： 复制‘scheduler.run_daily(stoploss)’ 至 init 
+2:  复制 def stoploss ， def createdic ，def findATR 到策略内
+3:  在 order  之后加入 createdic(context,bar_dict,stock)
+
+'''
+
+# 可以自己import我们平台支持的第三方python模块，比如pandas、numpy等。
+import pandas as pd 
+import numpy as np 
+import time 
+import math
+import talib
+import datetime 
+
+# 在这个方法中编写任何的初始化逻辑。context对象将会在你的算法策略的任何方法之间做传递。
+def init(context):
+    context.to_buy = ('300033.XSHE','000025.XSHE')
+    context.ATRperiod=22# ATR 中moving average 的N 值,可自己调, 默认为22
+    update_universe(context.to_buy)
+    context.trigger=0
+    context.initSL=0.9
+    context.profit=0.2 # 当盈利大于20% 就将阶梯设为此价位。
+    # 
+    context.maxvalue=pd.DataFrame()
+    # 实时打印日志
+    #scheduler.run_daily(stoploss)
+    logger.info("Interested at stock: " + str(context.to_buy))
+    scheduler.run_monthly(position,1)
+    scheduler.run_daily(stoploss)
+    
+def findATR(context,bar_dict,stock): 
+        close=history_bars(stock,context.ATRperiod+2,'1d','close')[0:context.ATRperiod]
+        high=history_bars(stock,context.ATRperiod+2,'1d','high')[1:context.ATRperiod+1]
+        low=history_bars(stock,context.ATRperiod+2,'1d','low')[1:context.ATRperiod+1]
+        art1=high-low
+        art2=abs(close-high)
+        art3=abs(close-low)
+        art123=np.matrix([art1, art2,art3])
+        print(art123)
+        rawatr=np.array(art123.max(0)).flatten()
+        print(rawatr)
+        ATR=rawatr.sum()/len(rawatr)
+        # print(str(rawatr)+'ATR='+str(rawatr))
+        print('股票 ',str(stock)+' 的ATR='+str(ATR))
+        return ATR
+        
+    
+def stoploss(context,bar_dict):
+    for stock in context.portfolio.positions:
+        high=bar_dict[stock].high
+        current=bar_dict[stock].last
+        # 获得买入价
+        bought_value=context.portfolio.positions[stock].avg_price*context.portfolio.positions[stock].quantity
+        
+        
+        # ----------------更新maxvalue里面的最高价格------------
+        stockdic=context.maxvalue[stock]
+        highest=stockdic[0]
+      
+        del context.maxvalue[stock]
+        ATR=findATR(context,bar_dict,stock)
+        
+        temp=pd.DataFrame({str(stock):[max(highest,high)]})
+        context.maxvalue=pd.concat([context.maxvalue,temp], axis=1, join='inner') 
+        # ------------------------------------------------------
+        
+        print(str(stock)+'的成本为：' +str( context.portfolio.positions[stock].avg_price) +', 最高价为：'+str(highest)+'ATR为：'+ str(ATR))
+        if bar_dict[stock].last<highest-3*ATR:
+            print(stock,'要卖出...')
+            ors = order_target_percent(stock,0)
+            if not (ors.status is ORDER_STATUS.REJECTED):
+                print('下单成功')
+                del context.maxvalue[stock]
+            else:
+                print('卖出失败')
+        
+     
+        
+    # pass 
+
+# 你选择的证券的数据更新将会触发此段逻辑，例如日或分钟历史数据切片或者是实时数据切片更新
+def handle_bar(context, bar_dict):
+    # 开始编写你的主要的算法逻辑
+    # bar_dict[order_book_id] 可以拿到某个证券的bar信息
+    # context.portfolio 可以拿到现在的投资组合状态信息
+
+    # 使用order_shares(id_or_ins, amount)方法进行落单
+
+    # TODO: 开始编写你的算法吧！
+    #position(context,bar_dict)
+    #logger.info(type(context.now))
+    pass
+   
+   
+            
+            
+def createdic(context,bar_dict,stock):
+    # 初始化的时候将maxvalue的最高价设置为0
+    if stock not in context.maxvalue.columns:
+        temp=pd.DataFrame({str(stock):[0]})    
+        context.maxvalue = pd.concat([context.maxvalue, temp], axis=1, join='inner')
+    print(context.maxvalue)
+    
+
+def position(context,bar_dict):
+    if len(context.to_buy)!=0:
+        for stock in context.to_buy:
+            createdic(context,bar_dict,stock)
+            order_target_percent(stock,1/len(context.to_buy))
+            
+            
+    else: 
+        order_target_percent(stock,0)
+    
