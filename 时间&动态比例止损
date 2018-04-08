@@ -1,0 +1,102 @@
+'''
+止损描述： 持股大于 X 天，且区间内回报少于 Y % 止损 
+           若回报大于Y% 则将止损线提高至 1+Y% 
+
+使用方法： 
+0:  设置持股天数 X，  在 init 中 ： context.period= X ； 设置区间内回报 Y，在 init 中 ： context.increment= Y (单位为比例， 非百分比。)
+1： 复制  def  record 和 def stoploss 至script 
+2： 在下单前 插入 ‘record(context,bar_dict,stock)’ （必须使用for loop 下单）
+3： 设置 scheduler.run_daily(stopless)
+
+'''
+                
+                
+# 可以自己import我们平台支持的第三方python模块，比如pandas、numpy等。
+import pandas as pd 
+import numpy as np 
+import time 
+import datetime 
+import math
+import itertools
+
+# 在这个方法中编写任何的初始化逻辑。context对象将会在你的算法策略的任何方法之间做传递。
+def init(context):
+    context.to_buy = ('300033.XSHE','000025.XSHE')
+    # 设定三个阈值，时间阈值，计算止损价格的梯度增量
+    context.period=10 
+    context.increment=0.15
+    # 规定某段时间内的跌幅不能超过0.05
+    context.period_wave = -0.05
+    context.time=pd.DataFrame()
+    scheduler.run_monthly(rebalance,1)
+    scheduler.run_daily(stoploss)
+    
+    
+
+# 你选择的证券的数据更新将会触发此段逻辑，例如日或分钟历史数据切片或者是实时数据切片更新
+def handle_bar(context, bar_dict):
+    # 开始编写你的主要的算法逻辑
+    # bar_dict[order_book_id] 可以拿到某个证券的bar信息
+    # context.portfolio 可以拿到现在的投资组合状态信息
+
+    # 使用order_shares(id_or_ins, amount)方法进行落单
+    
+    # TODO: 开始编写你的算法吧！
+   
+    pass 
+    
+
+    
+def stoploss( context,bar_dict):
+    # 根据时间 清仓
+    print(context.time)
+    for stock in  context.portfolio.positions: 
+        if stock in context.time.columns:
+            # 获得股票的入仓时间
+            in_time=context.time[stock][0] 
+            currenttime=context.now.replace(tzinfo=None) # 获取当前时间
+            
+            # 计算现在回报率
+            total_return=context.portfolio.positions[stock].pnl/context.portfolio.positions[stock].market_value 
+            
+            print(total_return)
+            
+            # 计算已经持有天数
+            holding_days=(currenttime-in_time).days
+            
+            # 计算梯度止损比例，如果收益小于这个止损比例，卖出
+            threshold=math.floor(holding_days/context.period)*context.increment
+            
+            # -------------------------止损判断条件--------------------
+            if holding_days>context.period and total_return<threshold:
+                print(str(stock)+ '已经持有大于' + str (context.period)+'天 且回报小于'+ str(threshold)+' 所以卖出')
+                order_target_percent(stock, 0)
+                del context.time[stock]
+            
+            elif total_return>threshold: 
+                print(str(stock)+'目前的回报为: ' +str(total_return)+'大于预设值'+str(threshold)+', 继续持有')
+                
+            elif total_return<context.period_wave:
+                print(str(stock)+'周期内跌幅超过5% 直接止损')
+            else:
+                print(str(stock)+ '持仓未到' +str(context.period)+'天,继续持有')
+            # ---------------------------------------------------------
+            
+def record(context,bar_dict,stock):
+    # 记录真正已经持有仓位的股票的入仓时间
+    if (stock not in context.time.columns) and (context.portfolio.positions[stock].quantity>0):
+        temp=pd.DataFrame({str(stock):[context.now.replace(tzinfo=None)]})
+        context.time = pd.concat([context.time, temp], axis=1, join='inner')
+
+
+def rebalance(context,bar_dict):
+    #在买入的同时 创建一个Dataframe 储存买入的时间。 
+    if len(context.to_buy)!=0:
+        for stock in context.to_buy:
+            order_target_percent(stock,1/len(context.to_buy))
+            record(context,bar_dict,stock)
+            
+        
+    # else: 
+    #     order_target_percent(stock,0)
+        
