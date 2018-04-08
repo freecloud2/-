@@ -1,0 +1,60 @@
+'''
+止损描述： 当前股价大于/小于 某一价格 进行 止盈/止损 
+使用方法： 
+0:  在init 中 设置止盈/止损比例， 
+    
+    止损:context.stoplossmultipler= 0.9 #亏损10% 触发止损
+    止盈：context.stoppofitmultipler= 1.5 #盈利 50% 触发止盈
+    
+1： 复制 def stoploss 至script 
+2： 设置 scheduler.run_daily(stopless)
+
+'''
+
+# 可以自己import我们平台支持的第三方python模块，比如pandas、numpy等。
+import pandas as pd 
+import numpy as np 
+import time 
+import datetime 
+
+# 在这个方法中编写任何的初始化逻辑。context对象将会在你的算法策略的任何方法之间做传递。
+def init(context):
+    context.to_buy = ('300033.XSHE','000025.XSHE','601766.XSHG')
+    context.stoplossmultipler= 0.95 #止损 乘数 
+    context.stoppofitmultipler= 1.5 #止盈 乘数
+    # 实时打印日志
+    #scheduler.run_daily(stoploss)
+    logger.info("Interested at stock: " + str(context.to_buy))
+    scheduler.run_monthly(position,1)
+    scheduler.run_daily(stoploss)
+    
+def stoploss(context,bar_dict):
+    for stock in context.portfolio.positions:
+        if bar_dict[stock].last<context.portfolio.positions[stock].avg_price*context.stoplossmultipler:# 现价低于 原价一定比例
+            order_target_percent(stock,0)
+            print(str(stock)+'跌幅超过'+str((1-context.stoplossmultipler)*100) +'%  触发止损')
+        elif bar_dict[stock].last>context.portfolio.positions[stock].avg_price*context.stoppofitmultipler:# 现价高于原价一定比例
+            order_target_percent(stock,0)
+            print(str(stock)+'涨幅幅超过'+str((context.stoppofitmultipler-1)*100) +'%  触发止盈')
+    pass 
+
+# 你选择的证券的数据更新将会触发此段逻辑，例如日或分钟历史数据切片或者是实时数据切片更新
+def handle_bar(context, bar_dict):
+    # 开始编写你的主要的算法逻辑
+    # bar_dict[order_book_id] 可以拿到某个证券的bar信息
+    # context.portfolio 可以拿到现在的投资组合状态信息
+
+    # 使用order_shares(id_or_ins, amount)方法进行落单
+
+    # TODO: 开始编写你的算法吧！
+    #position(context,bar_dict)
+    #logger.info(type(context.now))
+    pass
+   
+   
+            
+            
+def position(context,bar_dict):
+    if len(context.to_buy)!=0:
+        for stock in context.to_buy:
+            order_target_percent(stock,1/len(context.to_buy))
