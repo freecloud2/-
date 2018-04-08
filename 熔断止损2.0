@@ -1,0 +1,65 @@
+# 可以自己import我们平台支持的第三方python模块，比如pandas、numpy等。
+import pandas as pd 
+import numpy as np 
+import time 
+import math
+import datetime 
+
+# 在这个方法中编写任何的初始化逻辑。context对象将会在你的算法策略的任何方法之间做传递。
+def init(context):
+    context.to_buy=['600288.XSHG', '600993.XSHG', '000026.XSHE', '600182.XSHG', '600569.XSHG', '002013.XSHE', '600696.XSHG', '000690.XSHE', '600654.XSHG', '600275.XSHG', '600883.XSHG', '600122.XSHG', '000536.XSHE', '600739.XSHG', '600694.XSHG']
+    
+    # 实时打印日志
+    logger.info("Interested at stock: " + str(context.to_buy))
+    context.circuit=20 # 你想要熔断的天数
+    # 记录已经熔断的天数，如果大于20则未熔断。
+    context.counter=context.circuit
+    scheduler.run_daily(detect)
+    scheduler.run_daily(stoploss)
+    context.max_wave = -0.04
+    
+def stoploss(context,bar_dict):
+    context.counter+=1
+    pre_high = history_bars('000300.XSHG',1,'1d','high')[0]
+    pre_low = history_bars('000300.XSHG',1,'1d','low')[0]
+    
+    if pre_low/pre_high-1<context.max_wave: 
+        # 大盘跌幅超过4%  熔断冷静。
+        for s in context.portfolio.positions: 
+            order_target_percent(s,0)
+            context.counter=0
+    
+    
+def detect(context,bar_dict):
+    # 如果已经自行熔断了超过circuit天（20天）重新买入
+    if context.counter>context.circuit:
+        position(context,bar_dict)
+       
+    
+
+# 你选择的证券的数据更新将会触发此段逻辑，例如日或分钟历史数据切片或者是实时数据切片更新
+def handle_bar(context, bar_dict):
+    # 开始编写你的主要的算法逻辑
+    # bar_dict[order_book_id] 可以拿到某个证券的bar信息
+    # context.portfolio 可以拿到现在的投资组合状态信息
+
+    # 使用order_shares(id_or_ins, amount)方法进行落单
+
+    # TODO: 开始编写你的算法吧！
+    #position(context,bar_dict)
+    #logger.info(type(context.now))
+    pass
+   
+   
+    
+
+
+
+def position(context,bar_dict):
+    if len(context.to_buy)!=0:
+        for stock in context.to_buy:
+            order_target_percent(stock,1/len(context.to_buy))
+            
+            
+    # else: 
+    #     order_target_percent(stock,0)
